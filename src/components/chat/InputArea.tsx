@@ -4,9 +4,10 @@ import { Button } from '../ui/Button';
 type InputAreaProps = {
     onSend: (text: string) => void;
     isLoading: boolean;
+    onStop?: () => void;
 };
 
-export function InputArea({ onSend, isLoading }: InputAreaProps) {
+export function InputArea({ onSend, isLoading, onStop }: InputAreaProps) {
     const [value, setValue] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -64,17 +65,19 @@ export function InputArea({ onSend, isLoading }: InputAreaProps) {
                 onKeyDown={handleKeyDown}
             />
 
-            <Button variant="secondary" disabled>
-                Стоп
-            </Button>
-
-            <Button
-                variant="primary"
-                disabled={!value.trim() || isLoading}
-                onClick={handleSend}
-            >
-                {isLoading ? 'Отправка...' : 'Отправить'}
-            </Button>
+            {isLoading ? (
+                <Button variant="secondary" onClick={onStop}>
+                    Стоп
+                </Button>
+            ) : (
+                <Button
+                    variant="primary"
+                    disabled={!value.trim()}
+                    onClick={handleSend}
+                >
+                    Отправить
+                </Button>
+            )}
         </div>
     );
 }

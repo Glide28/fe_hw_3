@@ -66,19 +66,19 @@ export function ChatWindow({
 
     useEffect(() => {
         return () => {
-            if (timeoutRef.current) {
+            if (timeoutRef.current !== null) {
                 window.clearTimeout(timeoutRef.current);
             }
         };
     }, []);
 
-    const getCurrentTime = () =>
+    const getCurrentTime = (): string =>
         new Date().toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
         });
 
-    const generateId = () =>
+    const generateId = (): string =>
         `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     const getMockAssistantReply = (userText: string): string => {
@@ -94,6 +94,10 @@ export function ChatWindow({
 
         if (normalized.includes('привет')) {
             return 'Привет! Я готов помочь с домашним заданием по React.';
+        }
+
+        if (normalized.includes('тема')) {
+            return 'Для светлой и тёмной темы удобно использовать CSS-переменные и переключение `data-theme` на корневом элементе.';
         }
 
         return 'Это моковый ответ ассистента. Здесь позже можно будет подключить реальный API.';
@@ -124,7 +128,17 @@ export function ChatWindow({
 
             setMessages((prev) => [...prev, assistantMessage]);
             setIsLoading(false);
+            timeoutRef.current = null;
         }, delay);
+    };
+
+    const handleStopGeneration = () => {
+        if (timeoutRef.current !== null) {
+            window.clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+
+        setIsLoading(false);
     };
 
     return (
@@ -150,7 +164,11 @@ export function ChatWindow({
                 <div ref={messagesEndRef} />
             </div>
 
-            <InputArea onSend={handleSendMessage} isLoading={isLoading} />
+            <InputArea
+                onSend={handleSendMessage}
+                isLoading={isLoading}
+                onStop={handleStopGeneration}
+            />
         </section>
     );
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { MessageRole } from '../../types/message';
 
@@ -8,14 +9,21 @@ type MessageProps = {
 };
 
 export function Message({ role, content, timestamp }: MessageProps) {
+    const [copied, setCopied] = useState(false);
+
     const variant = role === 'user' ? 'user' : 'assistant';
     const author = role === 'user' ? 'Пользователь' : 'GigaChat';
 
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(content);
+            setCopied(true);
+
+            window.setTimeout(() => {
+                setCopied(false);
+            }, 2000);
         } catch {
-            // заглушка без дополнительной обработки
+            setCopied(false);
         }
     };
 
@@ -29,13 +37,16 @@ export function Message({ role, content, timestamp }: MessageProps) {
                 <div className="message__meta">
                     <span className="message__author">{author}</span>
                     <span className="message__time">{timestamp}</span>
-                    <button
-                        type="button"
-                        className="message__copy"
-                        onClick={handleCopy}
-                    >
-                        Копировать
-                    </button>
+
+                    {role === 'assistant' && (
+                        <button
+                            type="button"
+                            className="message__copy"
+                            onClick={handleCopy}
+                        >
+                            {copied ? 'Скопировано' : 'Копировать'}
+                        </button>
+                    )}
                 </div>
 
                 <div className="message__text">
