@@ -1,27 +1,21 @@
-import { Message } from './Message';
-
-type MessageItem = {
-    id: string;
-    author: string;
-    text: string;
-    variant: 'user' | 'assistant';
-};
+import { Message as MessageComponent } from './Message';
+import type { Message } from '../../types/message';
 
 type MessageListProps = {
-    messages: MessageItem[];
+    messages: Message[];
 };
 
 export function MessageList({ messages }: MessageListProps) {
     return (
-        <div className="message-list">
+        <>
             {messages.map((message) => (
-                <Message
+                <MessageComponent
                     key={message.id}
-                    author={message.author}
-                    text={message.text}
-                    variant={message.variant}
+                    role={message.role}
+                    content={message.content}
+                    timestamp={message.timestamp}
                 />
             ))}
-        </div>
+        </>
     );
 }

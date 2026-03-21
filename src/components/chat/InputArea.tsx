@@ -1,7 +1,12 @@
 import { type KeyboardEvent, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
 
-export function InputArea() {
+type InputAreaProps = {
+    onSend: (text: string) => void;
+    isLoading: boolean;
+};
+
+export function InputArea({ onSend, isLoading }: InputAreaProps) {
     const [value, setValue] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -21,7 +26,11 @@ export function InputArea() {
     };
 
     const handleSend = () => {
-        if (!value.trim()) return;
+        const trimmedValue = value.trim();
+
+        if (!trimmedValue || isLoading) return;
+
+        onSend(trimmedValue);
         setValue('');
         requestAnimationFrame(resizeTextarea);
     };
@@ -39,6 +48,7 @@ export function InputArea() {
                 type="button"
                 className="icon-button"
                 aria-label="Прикрепить изображение"
+                disabled={isLoading}
             >
                 📎
             </button>
@@ -49,17 +59,21 @@ export function InputArea() {
                 placeholder="Введите сообщение..."
                 rows={1}
                 value={value}
+                disabled={isLoading}
                 onChange={(e) => handleChange(e.target.value)}
                 onKeyDown={handleKeyDown}
             />
 
-            <Button variant="secondary">Стоп</Button>
+            <Button variant="secondary" disabled>
+                Стоп
+            </Button>
+
             <Button
                 variant="primary"
-                disabled={!value.trim()}
+                disabled={!value.trim() || isLoading}
                 onClick={handleSend}
             >
-                Отправить
+                {isLoading ? 'Отправка...' : 'Отправить'}
             </Button>
         </div>
     );

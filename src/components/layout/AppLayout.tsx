@@ -122,9 +122,8 @@ export function AppLayout() {
 
             <main className="main-content">
                 {activeChat ? (
-                    <ChatWindow
+                   <ChatWindow
                         chatTitle={activeChat.title}
-                        messages={messages}
                         onOpenSettings={() => setIsSettingsOpen(true)}
                     />
                 ) : (
