@@ -1,0 +1,158 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { randomUUID } from 'crypto';
+import https from 'https';
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 3001;
+
+// Временный dev-обход TLS-проблемы на локальной машине
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
+
+// кеш токена
+let accessToken = null;
+let expiresAt = 0;
+
+/**
+ * Выполняет HTTPS-запрос через встроенный модуль https
+ * и возвращает { status, body }
+ */
+function httpsRequest(url, { method = 'GET', headers = {}, body = null }) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      url,
+      {
+        method,
+        headers,
+        agent: httpsAgent,
+      },
+      (response) => {
+        let rawData = '';
+
+        response.on('data', (chunk) => {
+          rawData += chunk;
+        });
+
+        response.on('end', () => {
+          resolve({
+            status: response.statusCode ?? 0,
+            body: rawData,
+          });
+        });
+      }
+    );
+
+    request.on('error', (error) => {
+      reject(error);
+    });
+
+    if (body) {
+      request.write(body);
+    }
+
+    request.end();
+  });
+}
+
+async function getToken() {
+  if (accessToken && Date.now() < expiresAt) {
+    return accessToken;
+  }
+
+  const formBody = new URLSearchParams({
+    scope: 'GIGACHAT_API_PERS',
+  }).toString();
+
+  const response = await httpsRequest(
+    'https://ngw.devices.sberbank.ru:9443/api/v2/oauth',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        RqUID: randomUUID(),
+        Authorization: `Basic ${process.env.GIGACHAT_AUTH_KEY}`,
+        'Content-Length': Buffer.byteLength(formBody),
+      },
+      body: formBody,
+    }
+  );
+
+  console.log('OAUTH STATUS:', response.status);
+  console.log('OAUTH BODY:', response.body);
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`OAuth failed: ${response.status} ${response.body}`);
+  }
+
+  const data = JSON.parse(response.body);
+
+  accessToken = data.access_token;
+  expiresAt = Date.now() + 25 * 60 * 1000;
+
+  return accessToken;
+}
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { messages } = req.body;
+
+    console.log('REQUEST BODY:', req.body);
+
+    const token = await getToken();
+
+    const requestBody = JSON.stringify({
+      model: 'GigaChat',
+      messages,
+      stream: false,
+    });
+
+    const response = await httpsRequest(
+      'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Length': Buffer.byteLength(requestBody),
+        },
+        body: requestBody,
+      }
+    );
+
+    console.log('CHAT STATUS:', response.status);
+    console.log('CHAT BODY:', response.body);
+
+    if (response.status < 200 || response.status >= 300) {
+      return res.status(response.status).json({
+        error: `Chat failed: ${response.status}`,
+        details: response.body,
+      });
+    }
+
+    const data = JSON.parse(response.body);
+    res.json(data);
+  } catch (e) {
+    console.error('SERVER ERROR:', e);
+    res.status(500).json({
+      error: e.message || 'Ошибка GigaChat',
+    });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('Backend is running');
+});
+
+app.listen(PORT, () => {
+  console.log(`Server started: http://localhost:${PORT}`);
+});

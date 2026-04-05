@@ -1,10 +1,16 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import "./styles/theme.css";
-import App from './App.tsx'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import './styles/theme.css';
+import App from './App';
+import { ChatProvider } from './app/providers/ChatProvider';
 
 createRoot(document.getElementById('root')!).render(
-    <StrictMode>
+  <StrictMode>
+    <BrowserRouter>
+      <ChatProvider>
         <App />
-    </StrictMode>,
-)
+      </ChatProvider>
+    </BrowserRouter>
+  </StrictMode>,
+);
