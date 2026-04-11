@@ -17,12 +17,22 @@ export function ChatItem({
   onRename,
   onDelete,
 }: ChatItemProps) {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick?.();
+    }
+  };
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`chat-item ${isActive ? 'chat-item--active' : ''}`}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       data-chat-id={chatId}
+      aria-pressed={isActive}
     >
       <div className="chat-item__content">
         <div className="chat-item__title" title={title}>
@@ -56,6 +66,6 @@ export function ChatItem({
           🗑
         </button>
       </div>
-    </button>
+    </div>
   );
 }

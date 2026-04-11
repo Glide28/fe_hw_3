@@ -1,73 +1,750 @@
-# React + TypeScript + Vite
+# FE HW 3 — Chat Application with GigaChat API
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Учебный проект на **React + TypeScript + Vite**, реализующий чат-интерфейс с поддержкой:
 
-Currently, two official plugins are available:
+- глобального состояния через **Context API + useReducer**
+- нескольких чатов
+- поиска, переименования и удаления чатов
+- сохранения состояния в **localStorage**
+- маршрутизации через **react-router-dom**
+- интеграции с **GigaChat API**
+- рендеринга ответов через **react-markdown**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Назначение проекта
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Проект представляет собой SPA-приложение с чат-интерфейсом, в котором пользователь может:
 
-## Expanding the ESLint configuration
+- создавать несколько диалогов
+- переключаться между чатами
+- отправлять сообщения в GigaChat
+- видеть ответы модели
+- сохранять историю чатов между перезагрузками страницы
+- открывать конкретный чат по URL вида `/chat/:id`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Проект выполнен как домашнее задание по теме:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**«Управление состоянием приложения: Context, useReducer, внешний state-менеджмент»**
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Используемый стек
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- react-router-dom
+- react-markdown
+
+### State management
+- Context API
+- useReducer
+
+### Testing
+- Vitest
+- @testing-library/react
+- @testing-library/user-event
+- @testing-library/jest-dom
+- jsdom
+
+### Backend
+- Node.js
+- Express
+- CORS
+- dotenv
+
+### AI API
+- GigaChat API (через backend proxy)
+
+---
+
+## Архитектура проекта
+
+Проект разделён на две части:
+
+### 1. Frontend
+Расположен в корне проекта и отвечает за:
+- интерфейс
+- управление состоянием
+- маршрутизацию
+- отображение чатов и сообщений
+
+### 2. Backend
+Расположен в папке `server/` и отвечает за:
+- получение OAuth token для GigaChat
+- проксирование запросов к GigaChat API
+- защиту секретного ключа от попадания во frontend
+
+---
+
+## Структура проекта
+
+```txt
+fe_hw_3/
+├── server/
+│   ├── .env.example
+│   ├── index.js
+│   ├── package.json
+│   └── package-lock.json
+│
+├── src/
+│   ├── api/
+│   │   └── gigachat.ts
+│   │
+│   ├── app/
+│   │   ├── providers/
+│   │   │   ├── ChatProvider.tsx
+│   │   │   ├── chatReducer.test.ts
+│   │   │   └── ChatProvider.storage.test.tsx
+│   │   └── router/
+│   │       └── AppRouter.tsx
+│   │
+│   ├── components/
+│   │   ├── auth/
+│   │   ├── chat/
+│   │   │   ├── InputArea.test.tsx
+│   │   │   └── Message.test.tsx
+│   │   ├── layout/
+│   │   ├── settings/
+│   │   ├── sidebar/
+│   │   │   └── Sidebar.test.tsx
+│   │   └── ui/
+│   │
+│   ├── styles/
+│   ├── setupTests.ts
+│   ├── App.tsx
+│   └── main.tsx
+│
+├── .gitignore
+├── package.json
+├── package-lock.json
+├── vite.config.ts
+└── README.md
+````
+
+---
+
+## Ключевые файлы и их назначение
+
+### `src/main.tsx`
+
+Точка входа приложения.
+
+Отвечает за:
+
+* подключение глобальных стилей
+* оборачивание приложения в `BrowserRouter`
+* оборачивание приложения в `ChatProvider`
+
+---
+
+### `src/App.tsx`
+
+Корневой компонент приложения.
+
+Отвечает за:
+
+* проверку флага авторизации
+* показ `AuthForm`, если пользователь не авторизован
+* рендер `AppRouter`, если пользователь уже вошёл в приложение
+
+Флаг авторизации хранится в `localStorage`.
+
+---
+
+### `src/app/router/AppRouter.tsx`
+
+Маршрутизация приложения.
+
+Поддерживаемые маршруты:
+
+* `/` — главная страница приложения
+* `/chat/:id` — открытие конкретного чата по id
+
+Отвечает за:
+
+* выбор чата по URL
+* проверку существования чата
+* редирект на `/`, если чат не найден
+
+---
+
+### `src/app/providers/ChatProvider.tsx`
+
+Главный файл бизнес-логики приложения.
+
+Реализует:
+
+* глобальное состояние через `Context + useReducer`
+* список чатов
+* активный чат
+* отправку сообщений
+* создание чатов
+* переименование чатов
+* удаление чатов
+* сохранение состояния в `localStorage`
+* восстановление состояния из `localStorage`
+
+Именно этот файл является центральным state-слоем приложения.
+
+---
+
+### `src/api/gigachat.ts`
+
+Клиент для frontend-запроса к backend.
+
+Отвечает за:
+
+* отправку массива `messages`
+* вызов backend endpoint `http://localhost:3001/api/chat`
+* получение ответа модели
+
+Важно: frontend не работает с GigaChat напрямую.
+
+---
+
+### `src/components/layout/AppLayout.tsx`
+
+Основной layout после входа.
+
+Отвечает за:
+
+* отображение `Sidebar`
+* отображение `ChatWindow`
+* отображение `SettingsPanel`
+
+---
+
+### `src/components/chat/ChatWindow.tsx`
+
+Основное окно переписки.
+
+Отвечает за:
+
+* отображение сообщений активного чата
+* отображение индикатора загрузки
+* отправку сообщений через `InputArea`
+* автоскролл вниз
+
+---
+
+### `src/components/chat/MessageList.tsx`
+
+Отрисовывает список сообщений.
+
+---
+
+### `src/components/chat/Message.tsx`
+
+Отрисовывает одно сообщение.
+
+Поддерживает:
+
+* роли `user` / `assistant`
+* markdown через `react-markdown`
+* копирование ответа ассистента
+
+---
+
+### `src/components/chat/InputArea.tsx`
+
+Поле ввода сообщения.
+
+Поддерживает:
+
+* отправку кнопкой
+* отправку по `Enter`
+* `Shift + Enter` для новой строки
+* кнопку `Стоп` в режиме загрузки
+
+---
+
+### `src/components/sidebar/Sidebar.tsx`
+
+Боковая панель со списком чатов.
+
+Реализует:
+
+* создание нового чата
+* поиск по чатам
+* переименование чатов
+* удаление чатов
+* переход по маршруту `/chat/:id`
+
+---
+
+### `src/components/sidebar/ChatList.tsx`
+
+Список чатов в Sidebar.
+
+---
+
+### `src/components/sidebar/ChatItem.tsx`
+
+Один элемент чата.
+
+Содержит:
+
+* название чата
+* дату последнего сообщения
+* кнопку редактирования
+* кнопку удаления
+
+---
+
+### `server/index.js`
+
+Backend-прокси для GigaChat API.
+
+Отвечает за:
+
+* получение OAuth token
+* запросы к GigaChat API
+* возврат ответа во frontend
+
+Backend нужен, потому что ключ GigaChat нельзя хранить на клиенте.
+
+---
+
+### `src/setupTests.ts`
+
+Файл настройки тестового окружения.
+
+Подключает:
+
+* `@testing-library/jest-dom` — расширенные matchers для DOM-элементов (toBeInTheDocument, toHaveTextContent и т.д.)
+
+Выполняется автоматически перед каждым тестом через `vite.config.ts`.
+
+---
+
+### `src/app/providers/chatReducer.test.ts`
+
+Юнит-тесты для `chatReducer`.
+
+Тестирует:
+
+* `CREATE_CHAT` — добавляет новый чат и устанавливает его активным
+* `ADD_MESSAGE` — добавляет сообщение в указанный чат
+* `RENAME_CHAT` — меняет название чата
+* `DELETE_CHAT` — удаляет чат из списка
+* `DELETE_CHAT` — переключает `activeChatId` при удалении активного чата
+* `SET_LOADING` — корректно обновляет флаг загрузки
+
+---
+
+### `src/app/providers/ChatProvider.storage.test.tsx`
+
+Интеграционные тесты для `ChatProvider` и работы с `localStorage`.
+
+Тестирует:
+
+* восстановление состояния из `localStorage` при монтировании
+* корректную обработку повреждённого JSON (создаёт новый чат)
+* сохранение состояния в `localStorage` после инициализации
+
+---
+
+### `src/components/chat/InputArea.test.tsx`
+
+Юнит-тесты для компонента `InputArea`.
+
+Тестирует:
+
+* отправку сообщения по клику кнопки
+* отправку сообщения по нажатию `Enter`
+* блокировку отправки пустого сообщения
+
+---
+
+### `src/components/chat/Message.test.tsx`
+
+Юнит-тесты для компонента `Message`.
+
+Тестирует:
+
+* корректный рендер сообщения пользователя (`role: "user"`)
+* корректный рендер сообщения ассистента (`role: "assistant"`) с кнопкой «Копировать»
+
+---
+
+### `src/components/sidebar/Sidebar.test.tsx`
+
+Интеграционные тесты для компонента `Sidebar`.
+
+Используют моки для `useChat` и `useNavigate`.
+
+Тестируют:
+
+* отображение всех чатов при пустом поиске
+* фильтрацию чатов по поисковому запросу
+* вызов `window.confirm` при попытке удалить чат
+
+---
+
+## Логика работы приложения
+
+### 1. Авторизация
+
+При первом открытии отображается форма входа.
+После входа в `localStorage` сохраняется флаг авторизации.
+
+---
+
+### 2. Загрузка состояния
+
+При запуске `ChatProvider`:
+
+* пытается прочитать `chat_app_state` из `localStorage`
+* если данных нет или JSON повреждён — создаёт новый пустой чат
+
+---
+
+### 3. Работа с чатами
+
+Пользователь может:
+
+* создать новый чат
+* выбрать чат из списка
+* удалить чат
+* переименовать чат вручную
+* искать чат по названию и по содержимому последнего сообщения
+
+---
+
+### 4. Автоматическое название чата
+
+Если чат пустой и пользователь отправляет первое сообщение:
+
+* заголовок чата автоматически формируется по первым символам сообщения
+
+Пример:
+
+```txt
+Сообщение: "Помоги решить задачу по TypeScript"
+Название чата: "Помоги решить задачу по TypeScript"
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 5. Отправка сообщения
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+При отправке сообщения:
+
+1. сообщение пользователя добавляется в активный чат
+2. весь контекст диалога собирается в массив `messages`
+3. frontend отправляет этот массив в backend
+4. backend запрашивает GigaChat
+5. ответ модели добавляется в чат как сообщение `assistant`
+
+---
+
+### 6. Сохранение состояния
+
+После любого изменения стора:
+
+* весь `state` сериализуется в JSON
+* сохраняется в `localStorage`
+
+За счёт этого чаты и история сообщений сохраняются между перезагрузками.
+
+---
+
+### 7. Маршрутизация
+
+При выборе чата:
+
+* меняется `activeChatId`
+* вызывается `navigate('/chat/:id')`
+
+При прямом открытии URL:
+
+* router извлекает `id`
+* если чат найден — открывает его
+* если чат не найден — делает редирект на `/`
+
+---
+
+## Формат состояния
+
+Состояние приложения хранится в формате:
+
+```ts
+type ChatState = {
+  chats: Chat[];
+  activeChatId: string | null;
+  isLoading: boolean;
+};
 ```
+
+Чат:
+
+```ts
+type Chat = {
+  id: string;
+  title: string;
+  messages: Message[];
+};
+```
+
+Сообщение:
+
+```ts
+type Message = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+};
+```
+
+---
+
+## Как запустить проект
+
+## 1. Установка frontend-зависимостей
+
+```bash
+npm install
+```
+
+## 2. Установка backend-зависимостей
+
+```bash
+cd server
+npm install
+```
+
+## 3. Создание `.env`
+
+В папке `server/` создай файл:
+
+```txt
+.env
+```
+
+На основе шаблона:
+
+```txt
+.env.example
+```
+
+Содержимое:
+
+```env
+GIGACHAT_AUTH_KEY=your_gigachat_auth_key_here
+```
+
+---
+
+## 4. Запуск backend
+
+Из папки `server/`:
+
+```bash
+node index.js
+```
+
+Backend по умолчанию запускается на:
+
+```txt
+http://localhost:3001
+```
+
+---
+
+## 5. Запуск frontend
+
+Из корня проекта:
+
+```bash
+npm run dev
+```
+
+Frontend по умолчанию запускается на:
+
+```txt
+http://localhost:5173
+```
+
+---
+
+## 6. Запуск тестов
+
+Из корня проекта:
+
+```bash
+npm test
+```
+
+Или в режиме watch:
+
+```bash
+npx vitest
+```
+
+Тесты запускаются через **Vitest** в среде **jsdom**.
+
+Покрытие включает:
+- юнит-тесты `chatReducer`
+- интеграционные тесты `ChatProvider` + `localStorage`
+- тесты компонентов `InputArea`, `Message`, `Sidebar`
+
+---
+
+## Проверка работы
+
+После запуска:
+
+1. открыть `http://localhost:5173`
+2. пройти форму входа
+3. создать чат
+4. отправить сообщение
+5. убедиться, что пришёл ответ от GigaChat
+6. обновить страницу и проверить, что чаты сохранились
+7. открыть `/chat/:id` напрямую
+
+---
+
+## Что уже реализовано
+
+* [x] Context API + useReducer
+* [x] глобальный стор
+* [x] несколько чатов
+* [x] создание чатов
+* [x] переключение между чатами
+* [x] автогенерация названия
+* [x] ручное переименование
+* [x] удаление чатов с подтверждением
+* [x] поиск по чатам
+* [x] localStorage
+* [x] загрузка состояния из localStorage
+* [x] обработка битого JSON
+* [x] React Router
+* [x] маршрут `/`
+* [x] маршрут `/chat/:id`
+* [x] восстановление активного чата по URL
+* [x] интеграция с GigaChat API
+* [x] передача контекста диалога
+* [x] markdown-рендеринг
+* [x] тестирование с Vitest + @testing-library/react
+* [x] юнит-тесты chatReducer (6 тестов)
+* [x] интеграционные тесты ChatProvider + localStorage (3 теста)
+* [x] тесты компонента InputArea (3 теста)
+* [x] тесты компонента Message (2 теста)
+* [x] тесты компонента Sidebar (3 теста)
+
+---
+
+## Что можно улучшить дальше
+
+### 1. Streaming / SSE
+
+Сейчас реализован обычный REST-ответ.
+Можно добавить потоковую генерацию и постепенный вывод ответа.
+
+### 2. Подсветка кода
+
+Сейчас markdown уже работает, но можно добавить:
+
+* `highlight.js`
+  или
+* `Prism.js`
+
+### 3. Улучшение авторизации
+
+Сейчас реализована простая учебная заглушка через `localStorage`.
+
+### 4. Синхронизация удаления чата с URL
+
+Сейчас можно дополнительно доработать сценарий удаления активного чата, чтобы маршрут менялся ещё более явно и предсказуемо.
+
+### 5. Улучшение типизации
+
+Можно вынести типы `Message`, `Chat`, `ChatState`, `ChatAction` в отдельные файлы:
+
+* `src/types/chat.ts`
+* `src/types/message.ts`
+
+### 6. Рефакторинг reducer
+
+При росте проекта можно вынести:
+
+* reducer
+* actions
+* selectors
+  в отдельные модули.
+
+### 7. Расширение тестового покрытия
+
+Текущие тесты покрывают ключевые компоненты и логику. Можно дополнительно добавить:
+
+* тесты для `ChatWindow` и `AppRouter`
+* e2e-тесты с Playwright или Cypress
+* отчёт о покрытии через `vitest --coverage`
+
+---
+
+## Важные замечания по безопасности
+
+### Не коммитить в репозиторий:
+
+* `server/.env`
+* реальные ключи API
+* токены
+
+В репозитории должен храниться только шаблон:
+
+```txt
+server/.env.example
+```
+
+---
+
+## Полезные команды Git
+
+Проверка состояния:
+
+```bash
+git status
+```
+
+Добавление файлов:
+
+```bash
+git add .
+```
+
+Коммит:
+
+```bash
+git commit -m "ДЗ6: глобальный стор, маршрутизация, localStorage, GigaChat API"
+```
+
+Пуш:
+
+```bash
+git push origin main
+```
+
+---
+
+## Итог
+
+Проект представляет собой расширяемый учебный чат-клиент с архитектурой, близкой к реальным SPA-приложениям:
+
+* состояние вынесено в глобальный слой
+* логика централизована в провайдере
+* UI разбит на компоненты
+* маршруты поддерживают прямой вход по URL
+* история чатов сохраняется между сессиями
+* интеграция с AI выполнена через backend proxy
+
+Эту структуру можно дальше использовать как основу для:
+
+* полноценного мессенджера
+* AI-ассистента
+* интерфейса для работы с несколькими диалогами
+* учебного проекта с дальнейшим расширением функциональности

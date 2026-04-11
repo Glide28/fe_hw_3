@@ -110,7 +110,7 @@ const loadState = (): ChatState => {
   }
 };
 
-function chatReducer(state: ChatState, action: ChatAction): ChatState {
+export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'CREATE_CHAT': {
       const newChat: Chat = {
