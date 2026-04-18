@@ -24,6 +24,7 @@ type ChatState = {
   chats: Chat[];
   activeChatId: string | null;
   isLoading: boolean;
+  error: string | null;
 };
 
 type ChatContextType = {
@@ -31,6 +32,7 @@ type ChatContextType = {
   activeChatId: string | null;
   activeChat: Chat | null;
   isLoading: boolean;
+  error: string | null;
   sendMessage: (text: string) => Promise<void>;
   createChat: () => void;
   setActiveChat: (chatId: string) => void;
@@ -45,7 +47,8 @@ type ChatAction =
   | { type: 'ADD_MESSAGE'; payload: { chatId: string; message: Message } }
   | { type: 'RENAME_CHAT'; payload: { chatId: string; title: string } }
   | { type: 'DELETE_CHAT'; payload: { chatId: string } }
-  | { type: 'SET_LOADING'; payload: boolean };
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null };
 
 const STORAGE_KEY = 'chat_app_state';
 
@@ -71,6 +74,7 @@ const createEmptyState = (): ChatState => {
     ],
     activeChatId: initialChatId,
     isLoading: false,
+    error: null,
   };
 };
 
@@ -81,9 +85,7 @@ const generateChatTitle = (text: string): string => {
     return 'Новый чат';
   }
 
-  return trimmed.length > 40
-    ? `${trimmed.slice(0, 40)}...`
-    : trimmed;
+  return trimmed.length > 40 ? `${trimmed.slice(0, 40)}...` : trimmed;
 };
 
 const loadState = (): ChatState => {
@@ -104,6 +106,7 @@ const loadState = (): ChatState => {
       chats: parsed.chats,
       activeChatId: parsed.activeChatId ?? parsed.chats[0]?.id ?? null,
       isLoading: false,
+      error: null,
     };
   } catch {
     return createEmptyState();
@@ -168,6 +171,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         return {
           ...fallbackState,
           isLoading: false,
+          error: null,
         };
       }
 
@@ -186,6 +190,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         isLoading: action.payload,
+      };
+    }
+
+    case 'SET_ERROR': {
+      return {
+        ...state,
+        error: action.payload,
       };
     }
 
@@ -277,6 +288,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
 
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
       const currentChat = state.chats.find(
@@ -314,19 +326,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error(error);
 
-      const errorMessage: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: 'Ошибка при запросе к GigaChat',
-        timestamp: getCurrentTime(),
-      };
-
       dispatch({
-        type: 'ADD_MESSAGE',
-        payload: {
-          chatId: state.activeChatId,
-          message: errorMessage,
-        },
+        type: 'SET_ERROR',
+        payload: 'Ошибка при запросе к GigaChat',
       });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -340,6 +342,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         activeChatId: state.activeChatId,
         activeChat,
         isLoading: state.isLoading,
+        error: state.error,
         sendMessage,
         createChat,
         setActiveChat,

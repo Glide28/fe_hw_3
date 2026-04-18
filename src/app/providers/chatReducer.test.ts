@@ -11,6 +11,7 @@ describe('chatReducer', () => {
     ],
     activeChatId: '1',
     isLoading: false,
+    error: null,
   };
 
   it('CREATE_CHAT добавляет новый чат', () => {
@@ -27,9 +28,9 @@ describe('chatReducer', () => {
   it('ADD_MESSAGE добавляет сообщение', () => {
     const message = {
       id: 'm1',
-      role: 'user',
+      role: 'user' as const,
       content: 'Привет',
-      timestamp: '10:00',
+      timestamp: '2024-01-01T00:00:00.000Z',
     };
 
     const state = chatReducer(initialState, {
@@ -59,6 +60,7 @@ describe('chatReducer', () => {
         ],
         activeChatId: '1',
         isLoading: false,
+        error: null,
       },
       {
         type: 'DELETE_CHAT',
@@ -79,6 +81,7 @@ describe('chatReducer', () => {
         ],
         activeChatId: '1',
         isLoading: false,
+        error: null,
       },
       {
         type: 'DELETE_CHAT',

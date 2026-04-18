@@ -1,3 +1,5 @@
+import React from 'react';
+
 type ChatItemProps = {
   chatId: string;
   title: string;
@@ -8,7 +10,7 @@ type ChatItemProps = {
   onDelete?: () => void;
 };
 
-export function ChatItem({
+function ChatItem({
   chatId,
   title,
   date,
@@ -69,3 +71,5 @@ export function ChatItem({
     </div>
   );
 }
+
+export default React.memo(ChatItem);

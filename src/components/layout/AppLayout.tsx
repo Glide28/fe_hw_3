@@ -1,9 +1,24 @@
-import { useState } from 'react';
-import { Sidebar } from '../sidebar/Sidebar';
-import { ChatWindow } from '../chat/ChatWindow';
-import { SettingsPanel } from '../settings/SettingsPanel';
+import { useState, lazy, Suspense } from 'react';
 import { EmptyState } from '../chat/EmptyState';
 import { useChat } from '../../app/providers/ChatProvider';
+
+const Sidebar = lazy(() =>
+  import('../sidebar/Sidebar').then((module) => ({
+    default: module.Sidebar,
+  }))
+);
+
+const SettingsPanel = lazy(() =>
+  import('../settings/SettingsPanel').then((module) => ({
+    default: module.SettingsPanel,
+  }))
+);
+
+const ChatWindow = lazy(() =>
+  import('../chat/ChatWindow').then((module) => ({
+    default: module.ChatWindow,
+  }))
+);
 
 export function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -23,28 +38,34 @@ export function AppLayout() {
         ☰
       </button>
 
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
+      <Suspense fallback={<div>Loading...</div>}>
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </Suspense>
 
       <main className="main-content">
         {activeChat ? (
-          <ChatWindow
-            chatTitle={activeChat.title}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
+          <Suspense fallback={<div>Loading...</div>}>
+            <ChatWindow
+              chatTitle={activeChat.title}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          </Suspense>
         ) : (
           <EmptyState />
         )}
       </main>
 
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        theme={theme}
-        onClose={() => setIsSettingsOpen(false)}
-        onThemeChange={setTheme}
-      />
+      <Suspense fallback={<div>Loading...</div>}>
+        <SettingsPanel
+          isOpen={isSettingsOpen}
+          theme={theme}
+          onClose={() => setIsSettingsOpen(false)}
+          onThemeChange={setTheme}
+        />
+      </Suspense>
     </div>
   );
 }

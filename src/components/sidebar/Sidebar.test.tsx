@@ -30,7 +30,7 @@ describe('Sidebar', () => {
       messages: [
         {
           id: 'm1',
-          role: 'user',
+          role: 'user' as const,
           content: 'Нужно сделать sidebar',
           timestamp: '10:00',
         },
@@ -42,7 +42,7 @@ describe('Sidebar', () => {
       messages: [
         {
           id: 'm2',
-          role: 'assistant',
+          role: 'assistant' as const,
           content: 'Разобрать типы и интерфейсы',
           timestamp: '11:00',
         },
@@ -60,6 +60,7 @@ describe('Sidebar', () => {
       activeChatId: '1',
       activeChat: chats[0],
       isLoading: false,
+      error: null,
       sendMessage: vi.fn(),
       createChat: createChatMock,
       setActiveChat: setActiveChatMock,

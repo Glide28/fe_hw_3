@@ -3,6 +3,7 @@ import { MessageList } from './MessageList';
 import { TypingIndicator } from './TypingIndicator';
 import { InputArea } from './InputArea';
 import { useChat } from '../../app/providers/ChatProvider';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 type ChatWindowProps = {
   chatTitle: string;
@@ -13,7 +14,7 @@ export function ChatWindow({
   chatTitle,
   onOpenSettings,
 }: ChatWindowProps) {
-    const { activeChat, isLoading, sendMessage, stopGeneration } = useChat();
+  const { activeChat, isLoading, error, sendMessage, stopGeneration } = useChat();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -22,6 +23,16 @@ export function ChatWindow({
 
   const handleSendMessage = (text: string) => {
     void sendMessage(text);
+  };
+
+  const handleRetry = () => {
+    const lastUserMessage = [...(activeChat?.messages ?? [])]
+      .reverse()
+      .find((message) => message.role === 'user');
+
+    if (!lastUserMessage) return;
+
+    void sendMessage(lastUserMessage.content);
   };
 
   return (
@@ -42,7 +53,9 @@ export function ChatWindow({
       </header>
 
       <div className="message-list">
-        <MessageList messages={activeChat?.messages ?? []} />
+        <ErrorBoundary>
+          <MessageList messages={activeChat?.messages ?? []} />
+        </ErrorBoundary>
         <TypingIndicator isVisible={isLoading} />
         <div ref={messagesEndRef} />
       </div>
@@ -51,6 +64,8 @@ export function ChatWindow({
         onSend={handleSendMessage}
         isLoading={isLoading}
         onStop={stopGeneration}
+        error={error}
+        onRetry={handleRetry}
       />
     </section>
   );
