@@ -8,11 +8,23 @@ import { ErrorBoundary } from '../ErrorBoundary';
 type ChatWindowProps = {
   chatTitle: string;
   onOpenSettings: () => void;
+  model: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  systemPrompt: string;
+  repetitionPenalty: number;
 };
 
 export function ChatWindow({
   chatTitle,
   onOpenSettings,
+  model,
+  temperature,
+  topP,
+  maxTokens,
+  systemPrompt,
+  repetitionPenalty,
 }: ChatWindowProps) {
   const { activeChat, isLoading, error, sendMessage, stopGeneration } = useChat();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -22,7 +34,14 @@ export function ChatWindow({
   }, [activeChat?.messages, isLoading]);
 
   const handleSendMessage = (text: string) => {
-    void sendMessage(text);
+    void sendMessage(text, {
+      model,
+      temperature,
+      topP,
+      maxTokens,
+      systemPrompt,
+      repetitionPenalty,
+    });
   };
 
   const handleRetry = () => {
@@ -32,7 +51,14 @@ export function ChatWindow({
 
     if (!lastUserMessage) return;
 
-    void sendMessage(lastUserMessage.content);
+    void sendMessage(lastUserMessage.content, {
+      model,
+      temperature,
+      topP,
+      maxTokens,
+      systemPrompt,
+      repetitionPenalty,
+    });
   };
 
   return (

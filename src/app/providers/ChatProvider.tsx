@@ -3,9 +3,13 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useRef,
   type ReactNode,
 } from 'react';
-import { sendChatCompletion } from '../../api/gigachat';
+import {
+  sendChatCompletion,
+  streamChatCompletion,
+} from '../../api/gigachat';
 
 type Message = {
   id: string;
@@ -27,13 +31,22 @@ type ChatState = {
   error: string | null;
 };
 
+type ChatRequestOptions = {
+  model: string;
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  systemPrompt: string;
+  repetitionPenalty: number;
+};
+
 type ChatContextType = {
   chats: Chat[];
   activeChatId: string | null;
   activeChat: Chat | null;
   isLoading: boolean;
   error: string | null;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, options: ChatRequestOptions) => Promise<void>;
   createChat: () => void;
   setActiveChat: (chatId: string) => void;
   stopGeneration: () => void;
@@ -45,6 +58,7 @@ type ChatAction =
   | { type: 'CREATE_CHAT'; payload: { chatId: string; title: string } }
   | { type: 'SET_ACTIVE_CHAT'; payload: { chatId: string } }
   | { type: 'ADD_MESSAGE'; payload: { chatId: string; message: Message } }
+  | { type: 'UPDATE_LAST_MESSAGE'; payload: { chatId: string; content: string } }
   | { type: 'RENAME_CHAT'; payload: { chatId: string; title: string } }
   | { type: 'DELETE_CHAT'; payload: { chatId: string } }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -150,6 +164,24 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       };
     }
 
+    case 'UPDATE_LAST_MESSAGE': {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                messages: chat.messages.map((msg, index) =>
+                  index === chat.messages.length - 1
+                    ? { ...msg, content: action.payload.content }
+                    : msg,
+                ),
+              }
+            : chat,
+        ),
+      };
+    }
+
     case 'RENAME_CHAT': {
       return {
         ...state,
@@ -209,6 +241,7 @@ const ChatContext = createContext<ChatContextType | null>(null);
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(chatReducer, undefined, loadState);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const activeChat =
     state.chats.find((chat) => chat.id === state.activeChatId) ?? null;
@@ -251,12 +284,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const stopGeneration = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     dispatch({ type: 'SET_LOADING', payload: false });
   };
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, options: ChatRequestOptions) => {
     const trimmed = text.trim();
     if (!trimmed || state.isLoading || !state.activeChatId) return;
+
+    const chatId = state.activeChatId;
 
     const userMessage: Message = {
       id: generateId(),
@@ -268,20 +305,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     dispatch({
       type: 'ADD_MESSAGE',
       payload: {
-        chatId: state.activeChatId,
+        chatId,
         message: userMessage,
       },
     });
 
     const currentChatBeforeSend = state.chats.find(
-      (chat) => chat.id === state.activeChatId,
+      (chat) => chat.id === chatId,
     );
 
     if (currentChatBeforeSend && currentChatBeforeSend.messages.length === 0) {
       dispatch({
         type: 'RENAME_CHAT',
         payload: {
-          chatId: state.activeChatId,
+          chatId,
           title: generateChatTitle(trimmed),
         },
       });
@@ -290,13 +327,26 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
+    const assistantMessage: Message = {
+      id: generateId(),
+      role: 'assistant',
+      content: '',
+      timestamp: getCurrentTime(),
+    };
+
+    dispatch({
+      type: 'ADD_MESSAGE',
+      payload: {
+        chatId,
+        message: assistantMessage,
+      },
+    });
+
     try {
-      const currentChat = state.chats.find(
-        (chat) => chat.id === state.activeChatId,
-      );
+      const currentChat = state.chats.find((chat) => chat.id === chatId);
 
       const apiMessages = [
-        { role: 'system' as const, content: 'Ты полезный ассистент' },
+        { role: 'system' as const, content: options.systemPrompt },
         ...(currentChat?.messages ?? []).map((message) => ({
           role: message.role,
           content: message.content,
@@ -307,22 +357,59 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         },
       ];
 
-      const response = await sendChatCompletion(apiMessages);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      const assistantMessage: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: response,
-        timestamp: getCurrentTime(),
-      };
+      let accumulatedContent = '';
 
-      dispatch({
-        type: 'ADD_MESSAGE',
-        payload: {
-          chatId: state.activeChatId,
-          message: assistantMessage,
-        },
-      });
+      try {
+        await streamChatCompletion(
+          apiMessages,
+          {
+            model: options.model,
+            temperature: options.temperature,
+            topP: options.topP,
+            maxTokens: options.maxTokens,
+            repetitionPenalty: options.repetitionPenalty,
+          },
+          {
+            signal: controller.signal,
+            onChunk: (chunk) => {
+              accumulatedContent += chunk;
+
+              dispatch({
+                type: 'UPDATE_LAST_MESSAGE',
+                payload: {
+                  chatId,
+                  content: accumulatedContent,
+                },
+              });
+            },
+          },
+        );
+      } catch (streamError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const response = await sendChatCompletion(apiMessages, {
+          model: options.model,
+          temperature: options.temperature,
+          topP: options.topP,
+          maxTokens: options.maxTokens,
+          repetitionPenalty: options.repetitionPenalty,
+        });
+
+        dispatch({
+          type: 'UPDATE_LAST_MESSAGE',
+          payload: {
+            chatId,
+            content: response,
+          },
+        });
+
+        console.warn('Streaming failed, fallback to REST:', streamError);
+      }
     } catch (error) {
       console.error(error);
 
@@ -331,6 +418,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         payload: 'Ошибка при запросе к GigaChat',
       });
     } finally {
+      abortControllerRef.current = null;
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
